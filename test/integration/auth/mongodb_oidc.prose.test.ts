@@ -53,7 +53,7 @@ describe('Repro NODE-6962', function () {
     // First find should succeed and populate cache.
     await collection.findOne();
 
-    // Set failpoint to trigger reauth:
+    // Set failpoint to trigger a second auth attempt:
     let utilClient = new MongoClient(uriSingle, {
       authMechanismProperties: {
         ENVIRONMENT: 'gcp',
@@ -71,11 +71,32 @@ describe('Repro NODE-6962', function () {
         },
         data: {
           failCommands: ['find'],
+          closeConnection: true
+        }
+      });
+
+    try {
+      // Should close connection.
+      await collection.findOne();
+    } catch (e) {
+      console.log("caught expected exception:", e);
+    }
+
+    await utilClient
+      .db()
+      .admin()
+      .command({
+        configureFailPoint: 'failCommand',
+        mode: {
+          times: 1
+        },
+        data: {
+          failCommands: ['authenticate'],
           errorCode: 391
         }
       });
 
-    // Second find should still succeed after reauth.
+    // Second find should authenticate a new connection. Should succeed on second attempt of auth.
     await collection.findOne();
 
     await utilClient.db().admin().command({

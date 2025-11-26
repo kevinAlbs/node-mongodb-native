@@ -77,7 +77,10 @@ export abstract class MachineWorkflow implements Workflow {
    */
   async speculativeAuth(connection: Connection, credentials: MongoCredentials): Promise<Document> {
     // The spec states only cached access tokens can use speculative auth.
-    if (!this.cache.hasAccessToken) {
+    if (!this.cache.hasAccessToken || process.env.DISABLE_SPECULATIVE_OIDC === 'true') {
+      if (process.env.DISABLE_SPECULATIVE_OIDC === 'true') {
+        console.log('Speculative OIDC authentication is disabled via environment variable.');
+      }
       return {};
     }
     const token = await this.getTokenFromCacheOrEnv(connection, credentials);
