@@ -57,6 +57,9 @@ describe('Repro NODE-6962', function () {
     // First find should succeed and populate cache.
     await collection.findOne();
 
+    const provider = client.s.authProviders.getOrCreateProvider('MONGODB-OIDC', {}) as MongoDBOIDC;
+    expect(provider.workflow.cache.getAccessToken()).to.exist;
+
     // Set failpoint to trigger a second auth attempt:
     let utilClient = new MongoClient(uriSingle);
 
@@ -91,11 +94,11 @@ describe('Repro NODE-6962', function () {
         },
         data: {
           failCommands: ['authenticate'],
-          errorCode: 391
+          errorCode: 18
         }
       });
 
-    // Second find should authenticate a new connection. Should succeed on second attempt of auth.
+    // Second find should fail to authenticate new connection. Should succeed on second attempt of auth.
     await collection.findOne();
 
     await utilClient.db().admin().command({
