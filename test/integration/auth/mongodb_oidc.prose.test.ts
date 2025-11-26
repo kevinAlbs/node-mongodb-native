@@ -40,29 +40,28 @@ const generateResult = (token: string, expiresInSeconds?: number, extraFields?: 
 
 describe('Repro NODE-6962', function () {
   const uriSingle = process.env.MONGODB_URI_SINGLE;
-  let client = new MongoClient(uriSingle, {
-    authMechanismProperties: {
-      ENVIRONMENT: 'gcp',
-      TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
-    },
-    retryReads: false
-  });
-  let collection = client.db('test').collection('test');
 
-  afterEach(async function () {
-    await client?.close();
-  });
+  it('successfully authenticates after reauth', async function () {
+    let client = new MongoClient(uriSingle, {
+      authMechanismProperties: {
+        ENVIRONMENT: 'gcp',
+        TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
+      },
+      retryReads: false
+    });
+    let collection = client.db('test').collection('test');
 
+    // First find should succeed and populate cache.
+    await collection.findOne();
 
-  let utilClient: MongoClient;
-
-  beforeEach(async function () {
-    utilClient = new MongoClient(uriSingle, {
+    // Set failpoint to trigger reauth:
+    let utilClient = new MongoClient(uriSingle, {
       authMechanismProperties: {
         ENVIRONMENT: 'gcp',
         TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
       }
     });
+
     await utilClient
       .db()
       .admin()
@@ -76,19 +75,17 @@ describe('Repro NODE-6962', function () {
           errorCode: 391
         }
       });
-  });
 
-  afterEach(async function () {
+    // Second find should still succeed after reauth.
+    await collection.findOne();
+
     await utilClient.db().admin().command({
       configureFailPoint: 'failCommand',
       mode: 'off'
     });
+
     await utilClient.close();
     await client.close();
-  });
-
-  it('successfully authenticates', async function () {
-    await collection.findOne();
   });
 });
 
