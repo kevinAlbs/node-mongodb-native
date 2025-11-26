@@ -42,24 +42,23 @@ describe('Repro NODE-6962', function () {
 
   it('successfully authenticates after reauth', async function () {
     let client = new MongoClient(uriSingle, {
-      authMechanismProperties: {
-        ENVIRONMENT: 'gcp',
-        TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
-      },
-      retryReads: false
+
+      retryReads: false,
+      monitorCommands: true,
     });
+    client.on('commandStarted', (event) => {
+      console.log("command started: ", event.commandName);
+    })
+    client.on('connectionCreated', () => {
+      console.log("connection created");
+    })
     let collection = client.db('test').collection('test');
 
     // First find should succeed and populate cache.
     await collection.findOne();
 
     // Set failpoint to trigger a second auth attempt:
-    let utilClient = new MongoClient(uriSingle, {
-      authMechanismProperties: {
-        ENVIRONMENT: 'gcp',
-        TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
-      }
-    });
+    let utilClient = new MongoClient(uriSingle);
 
     await utilClient
       .db()
