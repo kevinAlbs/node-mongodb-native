@@ -36,6 +36,61 @@ const generateResult = (token: string, expiresInSeconds?: number, extraFields?: 
   return response;
 };
 
+
+describe('Repro NODE-6962', function () {
+  const uriSingle = process.env.MONGODB_URI_SINGLE;
+  let client = new MongoClient(uriSingle, {
+    authMechanismProperties: {
+      ENVIRONMENT: 'gcp',
+      TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
+    },
+    retryReads: false
+  });
+  let collection = client.db('test').collection('test');
+
+  afterEach(async function () {
+    await client?.close();
+  });
+
+
+  let utilClient: MongoClient;
+
+  beforeEach(async function () {
+    utilClient = new MongoClient(uriSingle, {
+      authMechanismProperties: {
+        ENVIRONMENT: 'gcp',
+        TOKEN_RESOURCE: process.env.TOKEN_RESOURCE
+      }
+    });
+    await utilClient
+      .db()
+      .admin()
+      .command({
+        configureFailPoint: 'failCommand',
+        mode: {
+          times: 1
+        },
+        data: {
+          failCommands: ['find'],
+          errorCode: 391
+        }
+      });
+  });
+
+  afterEach(async function () {
+    await utilClient.db().admin().command({
+      configureFailPoint: 'failCommand',
+      mode: 'off'
+    });
+    await utilClient.close();
+    await client.close();
+  });
+
+  it('successfully authenticates', async function () {
+    await collection.findOne();
+  });
+});
+
 describe('OIDC Auth Spec Tests', function () {
   beforeEach(function () {
     if (process.env.ENVIRONMENT !== 'test') {
