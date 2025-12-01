@@ -222,7 +222,7 @@ describe('OIDC Auth Spec Tests', function () {
           const provider = client.s.authProviders.getOrCreateProvider('MONGODB-OIDC', {
             OIDC_CALLBACK: callbackSpy
           }) as MongoDBOIDC;
-          provider.workflow.cache.put({ idpServerResponse: { accessToken: 'bad' } });
+          provider.workflow.cache.put({ accessToken: 'bad' });
           collection = client.db('test').collection('test');
         });
 
@@ -250,7 +250,7 @@ describe('OIDC Auth Spec Tests', function () {
           const provider = client.s.authProviders.getOrCreateProvider('MONGODB-OIDC', {
             OIDC_CALLBACK: callbackSpy
           }) as MongoDBOIDC;
-          provider.workflow.cache.put({ idpServerResponse: { accessToken: 'bad' } });
+          provider.workflow.cache.put({ accessToken: 'bad' });
           collection = client.db('test').collection('test');
         });
 
