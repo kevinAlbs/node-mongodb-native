@@ -38,8 +38,8 @@ const generateResult = (token: string, expiresInSeconds?: number, extraFields?: 
 
 describe('OIDC Auth Spec Tests', function () {
   beforeEach(function () {
-    if (process.env.ENVIRONMENT !== 'test') {
-      this.skipReason = 'GCP OIDC prose tests require a Test OIDC environment.';
+    if (process.env.ENVIRONMENT !== 'test' && process.env.ENVIRONMENT !== 'test-property') {
+      this.skipReason = 'OIDC prose tests require ENVIRONMENT=test (to test callback) or ENVIRONMENT=test-property (to test ENVIRONMENT property).';
       this.skip();
     }
   });
@@ -207,6 +207,19 @@ describe('OIDC Auth Spec Tests', function () {
 
       describe('3.1 Authentication failure with cached tokens fetch a new token and retry auth', function () {
         const callbackSpy = sinon.spy(createCallback());
+        let oidcProperties;
+        if (process.env.ENVIRONMENT === "test") {
+          oidcProperties = {
+            OIDC_CALLBACK: callbackSpy
+          }
+        } else if (process.env.ENVIRONMENT === "test-property") {
+          oidcProperties = {
+            ENVIRONMENT: 'test'
+          }
+        } else {
+          throw new Error(`Unexpected ENVIRONMENT: ${process.env.ENVIRONMENT} for OIDC prose tests`);
+        }
+
         // Create an OIDC configured client.
         // Poison the Client Cache with an invalid access token.
         // Perform a find operation that succeeds.
@@ -214,21 +227,20 @@ describe('OIDC Auth Spec Tests', function () {
         // Close the client.
         beforeEach(function () {
           client = new MongoClient(uriSingle, {
-            authMechanismProperties: {
-              OIDC_CALLBACK: callbackSpy
-            },
+            authMechanismProperties: oidcProperties,
             retryReads: false
           });
-          const provider = client.s.authProviders.getOrCreateProvider('MONGODB-OIDC', {
-            OIDC_CALLBACK: callbackSpy
-          }) as MongoDBOIDC;
+          const provider = client.s.authProviders.getOrCreateProvider('MONGODB-OIDC', oidcProperties) as MongoDBOIDC;
           provider.workflow.cache.put({ accessToken: 'bad' });
           collection = client.db('test').collection('test');
         });
 
         it('successfully authenticates', async function () {
           await collection.findOne();
-          expect(callbackSpy).to.have.been.calledOnce;
+          if (process.env.ENVIRONMENT === "test") {
+            // When testing custom callback, make additional assertions:
+            expect(callbackSpy).to.have.been.calledOnce;
+          }
         });
       });
 
